@@ -2,12 +2,14 @@ package slack
 
 import (
 	"encoding/json"
+	"os"
 
 	apex "github.com/apex/go-apex"
 )
 
 var (
-	_commandHandlers = map[string]CommandHandler{}
+	_commandHandlers   = map[string]CommandHandler{}
+	_verificationToken = os.Getenv("SLACK_VERIFICATION_TOKEN")
 )
 
 // H is the representation of a generic hash
@@ -37,19 +39,23 @@ func Handle(message json.RawMessage, ctx *apex.Context) (interface{}, error) {
 	}
 	err := json.Unmarshal(message, &request)
 	if err != nil {
-		return NewAPIGatewayJSONResponse(400, H{"message": "Invalid request from API Gateway"}), nil
+		return NewAPIGatewayJSONResponse(400, H{"text": "Invalid request from API Gateway"}), nil
 	}
 
 	err = request.ParseBody()
 	if err != nil {
-		return NewAPIGatewayJSONResponse(400, H{"message": "Invalid body format"}), nil
+		return NewAPIGatewayJSONResponse(400, H{"text": "Invalid body format"}), nil
+	}
+
+	if _verificationToken != "" && _verificationToken != request.ParsedBody.String("token") {
+		return NewAPIGatewayJSONResponse(400, H{"text": "Invalid verification token"}), nil
 	}
 
 	if handler, ok := _commandHandlers[request.ParsedBody.String("command")]; ok {
 		return handler(request), nil
 	}
 
-	return NewAPIGatewayJSONResponse(400, H{"message": "Unable to find a handler for your request"}), nil
+	return NewAPIGatewayJSONResponse(400, H{"text": "Unable to find a handler for your request"}), nil
 }
 
 // Init initializes the slack handler
